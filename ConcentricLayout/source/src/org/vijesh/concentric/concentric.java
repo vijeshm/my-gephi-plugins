@@ -13,6 +13,8 @@ import java.util.Arrays;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.gephi.graph.api.DirectedGraph;
+import org.gephi.graph.api.Edge;
 import org.gephi.graph.api.Graph;
 import org.gephi.graph.api.GraphModel;
 import org.gephi.graph.api.Node;
@@ -22,7 +24,7 @@ import org.gephi.layout.spi.LayoutBuilder;
 import org.gephi.layout.spi.LayoutProperty;
 
 /**
- * Example of a layout algorithm which places all nodes in a grid.
+ * Example of a layout algorithm which places all nodes in concentric circles.
  * <p>
  * On selecting a root node, the algorithm lays out the graph in the form of concentric circle with the root at the center.
  * The nodes at nth hop away from the root node is placed on the nth concentric circle.
@@ -64,7 +66,7 @@ public class concentric implements Layout {
 
     @Override
     public void goAlgo() {
-        Graph graph = graphModel.getGraphVisible();
+        DirectedGraph graph = (DirectedGraph) graphModel.getGraphVisible();
         int circleNumber = 1;
         double theta;
         double sectorAngle;
@@ -75,7 +77,7 @@ public class concentric implements Layout {
         float y;
         
         ArrayList<Node> nextCircle;
-        Node[] neigh;
+        ArrayList<Node> neigh;
         int len;
         float m;
         float n;
@@ -85,7 +87,7 @@ public class concentric implements Layout {
         graph.readLock();
         
         ArrayList<Node> nodes = new ArrayList( Arrays.asList( graph.getNodes().toArray() ) );
-        
+
         root = getRoot();
         rootNode = graph.getNode(root);
         
@@ -102,10 +104,16 @@ public class concentric implements Layout {
             System.exit(0);
         }
         
-        ArrayList<Node> currentCircle = new ArrayList ( Arrays.asList( graph.getNeighbors(rootNode).toArray() ) );
+        neigh = new ArrayList<Node>( Arrays.asList( graph.getSuccessors(rootNode).toArray() ) );
         
+        ArrayList<Node> currentCircle = neigh;        
         while ( !nodes.isEmpty() )
         {
+            if(currentCircle.isEmpty())
+            {
+                currentCircle = new ArrayList<Node>(nodes);
+            }
+                
             theta = 0;
             sectorAngle = 2 * Math.PI / currentCircle.size();
             nextCircle = new ArrayList<Node>();
@@ -126,15 +134,17 @@ public class concentric implements Layout {
                 currentCircle.get(j).getNodeData().setY( m*yDestn + n*y );
                 
                 nodes.remove(currentCircle.get(j));
-                neigh = graph.getNeighbors(currentCircle.get(j)).toArray();
-                for (int k=0; k<neigh.length; k++)
+                
+                neigh = new ArrayList<Node>( Arrays.asList( graph.getSuccessors(rootNode).toArray() ) );
+                
+                for (int k=0; k<neigh.size(); k++)
                 {
-                    nextCircle.add(neigh[k]);
+                    nextCircle.add(neigh.get(k));
                 }
                 theta += sectorAngle;
             }
             
-            Set<Node> currentCircleSet = new HashSet<Node>();            
+            Set<Node> currentCircleSet = new HashSet<Node>();
             len = nextCircle.size();
             for (int j=0; j<len; j++)
             {
@@ -151,7 +161,6 @@ public class concentric implements Layout {
             currentCircle = new ArrayList<Node>();
             currentCircle.addAll(currentCircleSet);
 
-            //System.out.println("circle Number: " + circleNumber);
             circleNumber += 1;
         }
         graph.readUnlock();
