@@ -22,6 +22,8 @@ import org.gephi.graph.api.NodeIterable;
 import org.gephi.layout.spi.Layout;
 import org.gephi.layout.spi.LayoutBuilder;
 import org.gephi.layout.spi.LayoutProperty;
+import org.openide.DialogDisplayer;
+import org.openide.NotifyDescriptor;
 
 /**
  * Example of a layout algorithm which places all nodes in concentric circles.
@@ -66,7 +68,8 @@ public class concentric implements Layout {
 
     @Override
     public void goAlgo() {
-        DirectedGraph graph = (DirectedGraph) graphModel.getGraphVisible();
+        Graph graph = graphModel.getGraphVisible();
+        
         int circleNumber = 1;
         double theta;
         double sectorAngle;
@@ -88,10 +91,24 @@ public class concentric implements Layout {
         
         ArrayList<Node> nodes = new ArrayList( Arrays.asList( graph.getNodes().toArray() ) );
 
-        root = getRoot();
-        rootNode = graph.getNode(root);
-        
-        try {
+        if ( nodes.size() == 0 )
+        {
+            NotifyDescriptor d = new NotifyDescriptor.Message("The Graph is empty", NotifyDescriptor.INFORMATION_MESSAGE);
+            DialogDisplayer.getDefault().notify(d);
+            endAlgo();
+        }
+        else
+        {
+            root = getRoot();
+            rootNode = graph.getNode(root);
+            if (rootNode == null)
+            {
+                root = graph.getNodes().toArray()[0].getNodeData().getId();
+                rootNode = graph.getNodes().toArray()[0];
+                NotifyDescriptor d = new NotifyDescriptor.Message("The specified root node doesnt exist. Choosing " + rootNode.getNodeData().getId() + " as the root node.", NotifyDescriptor.INFORMATION_MESSAGE);
+                DialogDisplayer.getDefault().notify(d);
+            }
+            try {
             x = rootNode.getNodeData().x();
             y = rootNode.getNodeData().y();
             m = getCoverage() * (speed / 10000f);
@@ -99,69 +116,86 @@ public class concentric implements Layout {
             rootNode.getNodeData().setX(n*x);
             rootNode.getNodeData().setY(n*y);
             nodes.remove(rootNode);
-        } catch (NullPointerException ex) {
-            Logger.getLogger(concentric.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(0);
-        }
-        
-        neigh = new ArrayList<Node>( Arrays.asList( graph.getSuccessors(rootNode).toArray() ) );
-        
-        ArrayList<Node> currentCircle = neigh;        
-        while ( !nodes.isEmpty() )
-        {
-            if(currentCircle.isEmpty())
-            {
-                currentCircle = new ArrayList<Node>(nodes);
+            } catch (NullPointerException ex) {
+                Logger.getLogger(concentric.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(0);
             }
-                
-            theta = 0;
-            sectorAngle = 2 * Math.PI / currentCircle.size();
-            nextCircle = new ArrayList<Node>();
-            
-            len = currentCircle.size();
-            for(int j=0; j<len; j++)
+        
+            if (graphModel.isDirected())    
             {
-                x = currentCircle.get(j).getNodeData().x();
-                y = currentCircle.get(j).getNodeData().y();
-                
-                xDestn = (float) (circleNumber * dist * Math.cos(theta));
-                yDestn = (float) (circleNumber * dist * Math.sin(theta));
-                
-                m = getCoverage() * (speed / 10000f);
-                n = 1 - m;
-                
-                currentCircle.get(j).getNodeData().setX( m*xDestn + n*x );
-                currentCircle.get(j).getNodeData().setY( m*yDestn + n*y );
-                
-                nodes.remove(currentCircle.get(j));
-                
-                neigh = new ArrayList<Node>( Arrays.asList( graph.getSuccessors(rootNode).toArray() ) );
-                
-                for (int k=0; k<neigh.size(); k++)
+                DirectedGraph Dgraph = (DirectedGraph) graph;
+                neigh = new ArrayList<Node>( Arrays.asList( Dgraph.getSuccessors(rootNode).toArray() ) );
+            }
+            else    
+            {
+                neigh = new ArrayList<Node>( Arrays.asList( graph.getNeighbors(rootNode).toArray() ) );
+            }
+            
+            ArrayList<Node> currentCircle = neigh;        
+            while ( !nodes.isEmpty() )
+            {
+                if(currentCircle.isEmpty())
                 {
-                    nextCircle.add(neigh.get(k));
+                    currentCircle = new ArrayList<Node>(nodes);
                 }
-                theta += sectorAngle;
-            }
+                
+                theta = 0;
+                sectorAngle = 2 * Math.PI / currentCircle.size();
+                nextCircle = new ArrayList<Node>();
             
-            Set<Node> currentCircleSet = new HashSet<Node>();
-            len = nextCircle.size();
-            for (int j=0; j<len; j++)
-            {
-                for (int k=0; k<nodes.size(); k++)
+                len = currentCircle.size();
+                for(int j=0; j<len; j++)
                 {
-                    if (nodes.get(k).equals(nextCircle.get(j)))
+                    x = currentCircle.get(j).getNodeData().x();
+                    y = currentCircle.get(j).getNodeData().y();
+                    
+                    xDestn = (float) (circleNumber * dist * Math.cos(theta));
+                    yDestn = (float) (circleNumber * dist * Math.sin(theta));
+                
+                    m = getCoverage() * (speed / 10000f);
+                    n = 1 - m;
+                
+                    currentCircle.get(j).getNodeData().setX( m*xDestn + n*x );
+                    currentCircle.get(j).getNodeData().setY( m*yDestn + n*y );
+                
+                    nodes.remove(currentCircle.get(j));
+                
+                    if (graphModel.isDirected())
                     {
-                        currentCircleSet.add(nextCircle.get(j));
-                        break;
+                        DirectedGraph Dgraph = (DirectedGraph) graph;
+                        neigh = new ArrayList<Node>( Arrays.asList( Dgraph.getSuccessors(rootNode).toArray() ) );
+                    }
+                    else    
+                    {
+                        neigh = new ArrayList<Node>( Arrays.asList( graph.getNeighbors(rootNode).toArray() ) );
+                    }
+                    
+                    for (int k=0; k<neigh.size(); k++)
+                    {
+                        nextCircle.add(neigh.get(k));
+                    }
+                    theta += sectorAngle;
+                }
+            
+                Set<Node> currentCircleSet = new HashSet<Node>();
+                len = nextCircle.size();
+                for (int j=0; j<len; j++)
+                {
+                    for (int k=0; k<nodes.size(); k++)
+                    {
+                        if (nodes.get(k).equals(nextCircle.get(j)))
+                        {
+                            currentCircleSet.add(nextCircle.get(j));
+                            break;
+                        }
                     }
                 }
-            }
             
-            currentCircle = new ArrayList<Node>();
-            currentCircle.addAll(currentCircleSet);
+                currentCircle = new ArrayList<Node>();
+                currentCircle.addAll(currentCircleSet);
 
-            circleNumber += 1;
+                circleNumber += 1;
+            }
         }
         graph.readUnlock();
     }
