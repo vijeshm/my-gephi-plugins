@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+OpenIDE-Module: org.vijesh.heart
+OpenIDE-Module-Localizing-Bundle: org/vijesh/heart/Bundle.properties
+OpenIDE-Module-Specification-Version: 1.0
+
